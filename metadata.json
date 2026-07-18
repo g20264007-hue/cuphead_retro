@@ -1,0 +1,6 @@
+{
+  "name": "Cuphead Mini Boss Battle",
+  "description": "An immersive 1930s cartoon-style Cuphead boss fight featuring run-and-gun platforming, psychic carrot attacks, parrying, super moves, and retro Web Audio synthesizer soundtracks.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
