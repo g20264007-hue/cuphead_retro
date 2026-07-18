@@ -27,6 +27,7 @@ export interface Player {
   invincibilityTimer: number;
   superMeter: number; // 0 to 100
   score: number;
+  parryActiveTimer?: number;
 }
 
 export interface Bullet {

@@ -54,6 +54,7 @@ export const CupheadCanvas: React.FC<CupheadCanvasProps> = ({
     invincibilityTimer: 0,
     superMeter: 0,
     score: 0,
+    parryActiveTimer: 0,
   });
 
   const bossRef = useRef<Boss>({
@@ -144,6 +145,9 @@ export const CupheadCanvas: React.FC<CupheadCanvasProps> = ({
       cupheadAudio.playJump();
       spawnDustParticles(player.x + player.width / 2, GROUND_Y, 'DUST', 6);
     } else {
+      // In mid-air, set parryActiveTimer to give a buffered window!
+      player.parryActiveTimer = 18; // active for 18 frames! (approx. 300ms)
+
       // In mid-air, check if close to any PINK (parryable) attack object
       const parried = checkForParry();
       if (parried) {
@@ -156,6 +160,7 @@ export const CupheadCanvas: React.FC<CupheadCanvasProps> = ({
         setParriedCount(c => c + 1);
         cupheadAudio.playParry();
         addLog('★ EXCELLENT PARRY! ★');
+        player.parryActiveTimer = 0; // reset on success
       }
     }
   };
@@ -191,8 +196,8 @@ export const CupheadCanvas: React.FC<CupheadCanvasProps> = ({
         const dy = (player.y + player.height / 2) - (atk.y + atk.height / 2);
         const dist = Math.sqrt(dx * dx + dy * dy);
 
-        // Within 55 pixels radius is parryable range
-        if (dist < 55) {
+        // Within 75 pixels radius is parryable range for easier, more reliable parrying!
+        if (dist < 75) {
           // Trigger Parry Sparkles
           spawnDustParticles(atk.x + atk.width / 2, atk.y + atk.height / 2, 'PARRY_FX', 15);
           // Remove the pink object
@@ -276,6 +281,7 @@ export const CupheadCanvas: React.FC<CupheadCanvasProps> = ({
       invincibilityTimer: 0,
       superMeter: 45, // give head start
       score: 0,
+      parryActiveTimer: 0,
     };
 
     bossRef.current = {
@@ -329,6 +335,9 @@ export const CupheadCanvas: React.FC<CupheadCanvasProps> = ({
         // Decrement timers
         if (player.dashCooldown > 0) player.dashCooldown--;
         if (player.invincibilityTimer > 0) player.invincibilityTimer--;
+        if (player.parryActiveTimer && player.parryActiveTimer > 0) {
+          player.parryActiveTimer--;
+        }
 
         // 1. Handle Player Air Dash
         if (player.state === 'DASHING') {
@@ -663,7 +672,23 @@ export const CupheadCanvas: React.FC<CupheadCanvasProps> = ({
             atk.y + atk.height > player.y + 5 &&
             atk.y < player.y + player.height - 5
           ) {
-            if (player.invincibilityTimer <= 0 && player.state !== 'DASHING') {
+            // Priority: Check if this is a pink parryable object, and the player is in mid-air AND either they pressed jump recently or they are holding/pressing the parry key!
+            if (atk.isParryable && !player.isGrounded && ((player.parryActiveTimer && player.parryActiveTimer > 0) || keysRef.current[' '] || keysRef.current['j'])) {
+              // Trigger Parry Success!
+              spawnDustParticles(atk.x + atk.width / 2, atk.y + atk.height / 2, 'PARRY_FX', 15);
+              player.vy = -10; // bounce player up
+              player.superMeter = Math.min(100, player.superMeter + 35);
+              onSuperUpdate(player.superMeter);
+              player.score += 500;
+              onScoreUpdate(player.score);
+              setParriedCount(c => c + 1);
+              cupheadAudio.playParry();
+              addLog('★ EXCELLENT PARRY! ★');
+              
+              // Reset parry active timer so they don't automatically parry multiple items instantly
+              player.parryActiveTimer = 0;
+              hitPlayer = true; // remove the object
+            } else if (player.invincibilityTimer <= 0 && player.state !== 'DASHING') {
               // Take damage!
               player.hp = Math.max(0, player.hp - 1);
               onHpUpdate(player.hp);
@@ -679,8 +704,8 @@ export const CupheadCanvas: React.FC<CupheadCanvasProps> = ({
                 cupheadAudio.playDefeat();
                 addLog('GAME OVER: YOU DIED');
               }
+              hitPlayer = true;
             }
-            hitPlayer = true;
           }
 
           // Keep attack if it did not hit player and is still on screen
